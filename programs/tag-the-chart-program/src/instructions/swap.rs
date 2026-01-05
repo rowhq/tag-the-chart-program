@@ -46,7 +46,7 @@ fn swap_to_target_price<'info>(
     a_to_b: bool,
     _: u16, // slippage_bps
 ) -> Result<()> {
-    let amount_specified = 50_000_000u64; //
+    let amount_specified = u64::MAX; //
     let minimum_amount_out = 0u64;
 
     // Determine which vault holds WSOL by checking mint addresses
@@ -127,7 +127,7 @@ fn swap_to_target_price<'info>(
         amount_specified,
         minimum_amount_out,
         target_sqrt_price,
-        a_to_b,
+        true,
     )?;
 
     Ok(())

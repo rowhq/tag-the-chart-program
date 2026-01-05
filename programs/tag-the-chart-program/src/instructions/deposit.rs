@@ -1,21 +1,22 @@
 use crate::state::TradingAccount;
 use anchor_lang::prelude::*;
-use anchor_lang::system_program;
-use anchor_spl::token_2022::{self, Token2022};
-use anchor_spl::token_interface::{Mint, TokenAccount};
+use anchor_spl::token;
+use anchor_spl::token_2022;
+use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface};
 
-/// Deposit Token2022 tokens into PDA-owned token account
+/// Deposit tokens into PDA-owned token account
 ///
 /// This transfers tokens from user's wallet to a PDA-owned token account.
-/// Only supports Token2022 (modern standard).
-pub fn deposit_tokens(ctx: Context<DepositTokens>, amount: u64) -> Result<()> {
+/// Works with both SPL Token and Token-2022, including WSOL.
+/// Use this for depositing already-wrapped WSOL.
+pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     require!(amount > 0, ErrorCode::InvalidAmount);
 
     // Transfer tokens from user's token account to PDA-owned token account
-    token_2022::transfer_checked(
+    token_interface::transfer_checked(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
-            token_2022::TransferChecked {
+            token_interface::TransferChecked {
                 from: ctx.accounts.user_token_account.to_account_info(),
                 mint: ctx.accounts.mint.to_account_info(),
                 to: ctx.accounts.pda_token_account.to_account_info(),
@@ -29,50 +30,8 @@ pub fn deposit_tokens(ctx: Context<DepositTokens>, amount: u64) -> Result<()> {
     Ok(())
 }
 
-/// Deposit native SOL into the trading account PDA
-///
-/// For SOL pairs (e.g., SOL/USDC), deposit native SOL instead of wrapped SOL.
-/// The PDA will hold SOL lamports directly.
-pub fn deposit_sol(ctx: Context<DepositSol>, amount: u64) -> Result<()> {
-    require!(amount > 0, ErrorCode::InvalidAmount);
-
-    // Transfer SOL from user to trading account PDA
-    // Balance automatically tracked by PDA account's lamports
-    system_program::transfer(
-        CpiContext::new(
-            ctx.accounts.system_program.to_account_info(),
-            system_program::Transfer {
-                from: ctx.accounts.user.to_account_info(),
-                to: ctx.accounts.trading_account.to_account_info(),
-            },
-        ),
-        amount,
-    )?;
-
-    msg!("Deposited {} lamports (SOL) to trading account", amount);
-
-    Ok(())
-}
-
 #[derive(Accounts)]
-pub struct DepositSol<'info> {
-    #[account(mut)]
-    pub user: Signer<'info>,
-
-    /// The user's trading account PDA
-    #[account(
-        mut,
-        seeds = [b"trading_account", user.key().as_ref()],
-        bump = trading_account.bump,
-        constraint = trading_account.owner  == user.key() @ ErrorCode::Unauthorized
-    )]
-    pub trading_account: Account<'info, TradingAccount>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct DepositTokens<'info> {
+pub struct Deposit<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
@@ -98,14 +57,20 @@ pub struct DepositTokens<'info> {
         mut,
         token::authority = trading_account,
         token::mint = mint,
+        constraint = *pda_token_account.to_account_info().owner == token_program.key() @ ErrorCode::InvalidTokenAccountOwner
     )]
     pub pda_token_account: InterfaceAccount<'info, TokenAccount>,
 
-    /// Token mint (Token2022)
+    /// Token mint (works with both SPL Token and Token-2022)
     pub mint: InterfaceAccount<'info, Mint>,
 
-    /// Token2022 program
-    pub token_program: Program<'info, Token2022>,
+    /// Token program (SPL Token or Token-2022)
+    #[account(
+        constraint = token_program.key() == token::ID
+            || token_program.key() == token_2022::ID
+            @ ErrorCode::InvalidTokenProgram
+    )]
+    pub token_program: Interface<'info, TokenInterface>,
 }
 
 #[error_code]
@@ -116,4 +81,8 @@ pub enum ErrorCode {
     Unauthorized,
     #[msg("Arithmetic overflow")]
     Overflow,
+    #[msg("Invalid token program: must be SPL Token or Token-2022")]
+    InvalidTokenProgram,
+    #[msg("Invalid token account owner: must be owned by the token program")]
+    InvalidTokenAccountOwner,
 }

@@ -53,19 +53,5 @@ export async function fetchPoolAccounts(
     tickArrays: tickArrayAddresses,
   };
 
-  console.log("\n📦 Pool accounts from mainnet:");
-  console.log("  Pool:", accounts.poolAddress.toBase58());
-  console.log("  AMM Config:", accounts.ammConfig.toBase58());
-  console.log("  Token Mint A:", accounts.tokenMintA.toBase58());
-  console.log("  Token Mint B:", accounts.tokenMintB.toBase58());
-  console.log("  Token Vault A:", accounts.tokenVaultA.toBase58());
-  console.log("  Token Vault B:", accounts.tokenVaultB.toBase58());
-  console.log("  Observation State:", accounts.observationState.toBase58());
-  console.log("  Current sqrt price:", accounts.currentSqrtPrice.toString());
-  console.log(
-    "  Tick arrays:",
-    accounts.tickArrays.map((a) => a.toBase58()).join(", ")
-  );
-
   return accounts;
 }
