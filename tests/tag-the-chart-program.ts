@@ -353,6 +353,7 @@ describe("tag-the-chart-program", () => {
       .swapToPrices(targetSqrtPrices, slippageBps)
       .accounts({
         user: user.publicKey,
+        //@ts-ignore
         raydiumProgram: RAYDIUM_CLMM_PROGRAM_ID,
         ammConfig: pool.ammConfig,
         poolState: pool.poolAddress,
