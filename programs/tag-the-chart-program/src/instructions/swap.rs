@@ -12,8 +12,9 @@ declare_id!("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
 
 pub fn swap_to_prices<'info>(
     ctx: Context<'_, '_, '_, 'info, SwapCandle<'info>>,
-    target_sqrt_prices: [u128; 3], // Target sqrt prices (X64 format) for each swap
-    slippage_bps: u16,             // Slippage tolerance in basis points (e.g., 50 = 0.5%)
+    to_sqrt_prices: [u128; 3], // Target sqrt prices (X64 format) for each swap
+    max_inputs: [u64; 3],      // Max input amounts (0 = no limit)
+    min_outputs: [u64; 3],     // Min output amounts (0 = no limit)
 ) -> Result<()> {
     let user_key = ctx.accounts.user.key();
     let bump = ctx.accounts.trading_account.bump;
@@ -21,36 +22,71 @@ pub fn swap_to_prices<'info>(
     let seeds = &[b"trading_account", user_key.as_ref(), &[bump]];
     let signer = &[&seeds[..]];
 
-    for (_, target_sqrt_price) in target_sqrt_prices.iter().enumerate() {
-        // Load pool to get current price, then drop borrow immediately
-        let current_sqrt_price = {
+    for (i, to_sqrt_price) in to_sqrt_prices.iter().enumerate() {
+        let from_sqrt_price = {
             let pool = ctx.accounts.pool_state.load()?;
             pool.sqrt_price_x64
         };
 
-        let price_increasing = *target_sqrt_price > current_sqrt_price;
+        let price_increasing = *to_sqrt_price > from_sqrt_price;
         let a_to_b = !price_increasing;
 
-        swap_to_target_price(&ctx, signer, *target_sqrt_price, a_to_b, slippage_bps)?;
+        swap_to_price(
+            &ctx,
+            signer,
+            *to_sqrt_price,
+            a_to_b,
+            max_inputs[i],
+            min_outputs[i],
+        )?;
+
+        verify_price_reached(&ctx, from_sqrt_price, *to_sqrt_price)?;
     }
 
     Ok(())
 }
 
-/// Uses a large input amount and relies on sqrt_price_limit to stop at target price.
-/// Raydium will calculate the exact amount needed and only swap what's necessary.
-fn swap_to_target_price<'info>(
+/// Verify that the swap reached the target price within tolerance and emit event
+fn verify_price_reached<'info>(
+    ctx: &Context<'_, '_, '_, 'info, SwapCandle<'info>>,
+    from_sqrt_price: u128,
+    to_sqrt_price: u128,
+) -> Result<()> {
+    let actual_sqrt_price = {
+        let pool = ctx.accounts.pool_state.load()?;
+        pool.sqrt_price_x64
+    };
+
+    let diff = if actual_sqrt_price > to_sqrt_price {
+        actual_sqrt_price - to_sqrt_price
+    } else {
+        to_sqrt_price - actual_sqrt_price
+    };
+
+    let tolerance = to_sqrt_price / 1000;
+    require!(diff <= tolerance, ErrorCode::PriceNotReached);
+
+    emit!(SwapExecuted {
+        from_sqrt_price,
+        to_sqrt_price,
+        actual_sqrt_price,
+    });
+
+    Ok(())
+}
+
+/// Executes a swap to a target price with optional input/output limits.
+/// Uses sqrt_price_limit to stop at the exact target price.
+fn swap_to_price<'info>(
     ctx: &Context<'_, '_, '_, 'info, SwapCandle<'info>>,
     signer_seeds: &[&[&[u8]]],
-    target_sqrt_price: u128,
+    to_sqrt_price: u128,
     a_to_b: bool,
-    _: u16, // slippage_bps
+    max_input: u64,
+    min_output: u64,
 ) -> Result<()> {
-    let amount_specified = u64::MAX; //
-    let minimum_amount_out = 0u64;
-
-    // Determine which vault holds WSOL by checking mint addresses
-    // WSOL mint: So11111111111111111111111111111111111111112
+    let amount_specified = if max_input == 0 { u64::MAX } else { max_input };
+    let minimum_amount_out = min_output;
 
     let wsol_mint = pubkey!("So11111111111111111111111111111111111111112");
     let is_mint_a_wsol = ctx.accounts.token_mint_a.key() == wsol_mint;
@@ -126,7 +162,7 @@ fn swap_to_target_price<'info>(
         cpi_ctx,
         amount_specified,
         minimum_amount_out,
-        target_sqrt_price,
+        to_sqrt_price,
         true,
     )?;
 
@@ -134,7 +170,7 @@ fn swap_to_target_price<'info>(
 }
 
 #[derive(Accounts)]
-#[instruction(target_sqrt_prices: [u128; 3], slippage_bps: u16)]
+#[instruction(target_sqrt_prices: [u128; 3], max_inputs: [u64; 3], min_outputs: [u64; 3])]
 pub struct SwapCandle<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
@@ -199,8 +235,13 @@ pub struct SwapCandle<'info> {
 pub enum ErrorCode {
     #[msg("Unauthorized: You don't own this trading account")]
     Unauthorized,
-    #[msg("Arithmetic overflow")]
-    Overflow,
-    #[msg("Invalid pool data")]
-    InvalidPoolData,
+    #[msg("Price not reached: swap did not reach target price within tolerance")]
+    PriceNotReached,
+}
+
+#[event]
+pub struct SwapExecuted {
+    pub from_sqrt_price: u128,
+    pub to_sqrt_price: u128,
+    pub actual_sqrt_price: u128,
 }

@@ -5,7 +5,7 @@ mod state;
 
 use instructions::*;
 
-declare_id!("75SUaVzpGhU8R1TGJeS4zK4vBWWr1YtAQtWbNwY2C2or");
+declare_id!("47z6kVAxM8LxGqSgFHXyMq3eK4Lq2U7TQXLpV3bjPtdD");
 
 #[program]
 pub mod tag_the_chart_program {
@@ -16,6 +16,16 @@ pub mod tag_the_chart_program {
         instructions::initialize::initialize(ctx)
     }
 
+    /// Execute a candle pattern (3 atomic swaps in one transaction)
+    pub fn swap_to_prices<'info>(
+        ctx: Context<'_, '_, '_, 'info, SwapCandle<'info>>,
+        target_sqrt_prices: [u128; 3],
+        max_inputs: [u64; 3],
+        min_outputs: [u64; 3],
+    ) -> Result<()> {
+        instructions::swap::swap_to_prices(ctx, target_sqrt_prices, max_inputs, min_outputs)
+    }
+
     /// Deposit tokens (SPL Token or Token-2022, including WSOL)
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         instructions::deposit::deposit(ctx, amount)
@@ -24,14 +34,5 @@ pub mod tag_the_chart_program {
     /// Withdraw tokens (SPL Token or Token-2022, including WSOL)
     pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
         instructions::withdraw::withdraw(ctx, amount)
-    }
-
-    /// Execute a candle pattern (3 atomic swaps in one transaction)
-    pub fn swap_to_prices<'info>(
-        ctx: Context<'_, '_, '_, 'info, SwapCandle<'info>>,
-        target_sqrt_prices: [u128; 3],
-        slippage_bps: u16,
-    ) -> Result<()> {
-        instructions::swap::swap_to_prices(ctx, target_sqrt_prices, slippage_bps)
     }
 }
