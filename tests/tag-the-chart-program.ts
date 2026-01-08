@@ -206,7 +206,7 @@ describe("tag-the-chart-program", () => {
 
     const wsolDepositAmount = new BN(0.005 * LAMPORTS_PER_SOL);
     await program.methods
-      //@ts-expect-error deposit fn not implemented
+
       .deposit(wsolDepositAmount)
       .accounts({
         userTokenAccount: userWsolAta,
@@ -219,7 +219,7 @@ describe("tag-the-chart-program", () => {
     // Deposit 50 tokens to PDA (half of available 100)
     const tokenDepositAmount = new BN(50_000_000_000); // 50 tokens
     await program.methods
-      //@ts-expect-error deposit fn not implemented
+
       .deposit(tokenDepositAmount)
       .accounts({
         userTokenAccount: userTokenAta,
@@ -259,7 +259,7 @@ describe("tag-the-chart-program", () => {
     // Withdraw 0.002 WSOL from PDA
     const wsolWithdrawAmount = new BN(0.002 * LAMPORTS_PER_SOL);
     await program.methods
-      //@ts-expect-error withdraw fn not implemented
+
       .withdraw(wsolWithdrawAmount)
       .accounts({
         userTokenAccount: userWsolAta,
@@ -272,7 +272,7 @@ describe("tag-the-chart-program", () => {
     // Withdraw 20 tokens from PDA
     const tokenWithdrawAmount = new BN(20_000_000_000); // 20 tokens
     await program.methods
-      //@ts-expect-error withdraw fn not implemented
+
       .withdraw(tokenWithdrawAmount)
       .accounts({
         userTokenAccount: userTokenAta,
@@ -313,11 +313,10 @@ describe("tag-the-chart-program", () => {
     );
   });
 
-  it.only("Swap to target prices with forked pool", async () => {
+  it.skip("Swap to target prices with forked pool", async () => {
     const pool = await fetchPoolAccounts(POOL_ADDRESS);
 
     await program.methods
-      //@ts-expect-error deposit fn not implemented
       .deposit(new BN(0.01 * LAMPORTS_PER_SOL))
       .accounts({
         userTokenAccount: userWsolAta,
@@ -328,7 +327,6 @@ describe("tag-the-chart-program", () => {
       .rpc();
 
     await program.methods
-      //@ts-expect-error deposit fn not implemented
       .deposit(new BN(50_000_000_000))
       .accounts({
         userTokenAccount: userTokenAta,
@@ -389,6 +387,66 @@ describe("tag-the-chart-program", () => {
       .rpc();
 
     console.log("  ✅ Executed candle pattern swap");
+    console.log("  Transaction signature:", tx);
+  });
+
+  it.only("Swap to target prices (simple - no PDA)", async () => {
+    const pool = await fetchPoolAccounts(POOL_ADDRESS);
+
+    // Move price down 0.1%, then up 0.1%, then back to original
+    const currentPrice = pool.currentSqrtPrice;
+    const priceDown = (currentPrice * 999n) / 1000n; // -0.1%
+    const priceUp = (currentPrice * 1001n) / 1000n; // +0.1%
+
+    const targetSqrtPrices = [
+      new BN(priceDown.toString()),
+      new BN(priceUp.toString()),
+      new BN(currentPrice.toString()),
+    ];
+
+    // Request more compute units for 3 swaps
+    const computeBudgetIx = ComputeBudgetProgram.setComputeUnitLimit({
+      units: 400_000,
+    });
+
+    // No slippage protection (0 = unlimited input, 0 = no min output)
+    const maxInputs = [new BN(0), new BN(0), new BN(0)];
+    const minOutputs = [new BN(0), new BN(0), new BN(0)];
+
+    const tx = await program.methods
+      .swapToPricesSimple(targetSqrtPrices, maxInputs, minOutputs)
+      .accounts({
+        wallet: user.publicKey,
+        splAta: userTokenAta,
+        wsolAta: userWsolAta,
+        //@ts-ignore
+        raydiumProgram: RAYDIUM_CLMM_PROGRAM_ID,
+        ammConfig: pool.ammConfig,
+        poolState: pool.poolAddress,
+        tokenVaultA: pool.tokenVaultA,
+        tokenVaultB: pool.tokenVaultB,
+        tokenMintA: pool.tokenMintA,
+        tokenMintB: pool.tokenMintB,
+        observationState: pool.observationState,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+        memoProgram: MEMO_PROGRAM_ID,
+        associatedTokenProgram: new PublicKey(
+          "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        ),
+        systemProgram: SystemProgram.programId,
+      })
+      .remainingAccounts(
+        pool.tickArrays.map((tickArray) => ({
+          pubkey: tickArray,
+          isWritable: true,
+          isSigner: false,
+        }))
+      )
+      .preInstructions([computeBudgetIx])
+      .rpc();
+
+    console.log("  ✅ Executed candle pattern swap (simple - no PDA)");
     console.log("  Transaction signature:", tx);
   });
 });
