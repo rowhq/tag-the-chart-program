@@ -206,7 +206,7 @@ describe("tag-the-chart-program", () => {
 
     const wsolDepositAmount = new BN(0.005 * LAMPORTS_PER_SOL);
     await program.methods
-
+      //@ts-expect-error
       .deposit(wsolDepositAmount)
       .accounts({
         userTokenAccount: userWsolAta,
@@ -219,7 +219,7 @@ describe("tag-the-chart-program", () => {
     // Deposit 50 tokens to PDA (half of available 100)
     const tokenDepositAmount = new BN(50_000_000_000); // 50 tokens
     await program.methods
-
+      //@ts-expect-error
       .deposit(tokenDepositAmount)
       .accounts({
         userTokenAccount: userTokenAta,
@@ -259,7 +259,7 @@ describe("tag-the-chart-program", () => {
     // Withdraw 0.002 WSOL from PDA
     const wsolWithdrawAmount = new BN(0.002 * LAMPORTS_PER_SOL);
     await program.methods
-
+      //@ts-expect-error
       .withdraw(wsolWithdrawAmount)
       .accounts({
         userTokenAccount: userWsolAta,
@@ -272,7 +272,7 @@ describe("tag-the-chart-program", () => {
     // Withdraw 20 tokens from PDA
     const tokenWithdrawAmount = new BN(20_000_000_000); // 20 tokens
     await program.methods
-
+      //@ts-expect-error
       .withdraw(tokenWithdrawAmount)
       .accounts({
         userTokenAccount: userTokenAta,
@@ -317,6 +317,7 @@ describe("tag-the-chart-program", () => {
     const pool = await fetchPoolAccounts(POOL_ADDRESS);
 
     await program.methods
+      //@ts-expect-error
       .deposit(new BN(0.01 * LAMPORTS_PER_SOL))
       .accounts({
         userTokenAccount: userWsolAta,
@@ -327,6 +328,7 @@ describe("tag-the-chart-program", () => {
       .rpc();
 
     await program.methods
+      //@ts-expect-error
       .deposit(new BN(50_000_000_000))
       .accounts({
         userTokenAccount: userTokenAta,
@@ -357,6 +359,7 @@ describe("tag-the-chart-program", () => {
     const minOutputs = [new BN(0), new BN(0), new BN(0)];
 
     const tx = await program.methods
+      //@ts-expect-error
       .swapToPrices(targetSqrtPrices, maxInputs, minOutputs)
       .accounts({
         user: user.publicKey,

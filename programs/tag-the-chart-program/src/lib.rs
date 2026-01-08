@@ -16,16 +16,6 @@ pub mod tag_the_chart_program {
         instructions::initialize::initialize(ctx)
     }
 
-    /// Execute a candle pattern (3 atomic swaps) - PDA version
-    pub fn swap_to_prices<'info>(
-        ctx: Context<'_, '_, '_, 'info, SwapCandle<'info>>,
-        target_sqrt_prices: [u128; 3],
-        max_inputs: [u64; 3],
-        min_outputs: [u64; 3],
-    ) -> Result<()> {
-        instructions::swap::swap_to_prices(ctx, target_sqrt_prices, max_inputs, min_outputs)
-    }
-
     /// Execute a candle pattern (3 atomic swaps) - Simple wallet version with auto-wrap
     pub fn swap_to_prices_simple<'info>(
         ctx: Context<'_, '_, '_, 'info, SwapCandleSimple<'info>>,
@@ -41,13 +31,23 @@ pub mod tag_the_chart_program {
         )
     }
 
-    /// Deposit tokens (SPL Token or Token-2022, including WSOL)
-    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-        instructions::deposit::deposit(ctx, amount)
-    }
+    // /// Execute a candle pattern (3 atomic swaps) - PDA version
+    // pub fn swap_to_prices<'info>(
+    //     ctx: Context<'_, '_, '_, 'info, SwapCandle<'info>>,
+    //     target_sqrt_prices: [u128; 3],
+    //     max_inputs: [u64; 3],
+    //     min_outputs: [u64; 3],
+    // ) -> Result<()> {
+    //     instructions::swap::swap_to_prices(ctx, target_sqrt_prices, max_inputs, min_outputs)
+    // }
 
-    /// Withdraw tokens (SPL Token or Token-2022, including WSOL)
-    pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
-        instructions::withdraw::withdraw(ctx, amount)
-    }
+    // /// Deposit tokens (SPL Token or Token-2022, including WSOL)
+    // pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+    //     instructions::deposit::deposit(ctx, amount)
+    // }
+
+    // /// Withdraw tokens (SPL Token or Token-2022, including WSOL)
+    // pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
+    //     instructions::withdraw::withdraw(ctx, amount)
+    // }
 }
